@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>食堂吃什么</title>
+<style>
+/* 布局思路：手机宽度的单列应用 + 底部四个标签；宽屏时左侧多出一栏产品说明 */
+:root{
+  color-scheme:light;
+  --paper:#eef1ec; --card:#ffffff; --ink:#17201c; --mute:#65706a; --line:#dde2da;
+  --accent:#0e5e6f; --accent-soft:#e2eff1;
+  --good:#2c8650; --good-soft:#e4f3e9; --warn:#a86f00; --warn-soft:#fbf0d5; --bad:#c0362c; --bad-soft:#fbe6e3;
+  --display:"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  --body:"PingFang SC","HarmonyOS Sans SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;
+  --r:14px;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer;border:0;background:none;padding:0}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,p{margin:0}
+.num{font-variant-numeric:tabular-nums}
+
+.shell{height:100%;display:flex;justify-content:center;gap:40px;padding:0}
+.notes{display:none}
+.app{width:100%;max-width:480px;height:100%;display:flex;flex-direction:column;background:var(--paper);position:relative}
+.view{flex:1;overflow-y:auto;padding:18px 16px 24px;display:flex;flex-direction:column;gap:18px}
+.nav{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border-top:1px solid var(--line)}
+.nav button{padding:10px 0 12px;font-size:12px;color:var(--mute);display:flex;flex-direction:column;align-items:center;gap:3px}
+.nav button i{width:22px;height:4px;border-radius:2px;background:transparent}
+.nav button[aria-current="page"]{color:var(--accent);font-weight:600}
+.nav button[aria-current="page"] i{background:var(--accent)}
+
+@media (min-width:900px){
+  .shell{padding:28px 24px;align-items:stretch}
+  .notes{display:flex;flex-direction:column;gap:18px;width:340px;padding-top:8px;overflow-y:auto}
+  .app{border:1px solid var(--line);border-radius:26px;overflow:hidden;box-shadow:0 18px 40px rgba(23,32,28,.08)}
+}
+
+.top h1{font-family:var(--display);font-size:24px;font-weight:700;letter-spacing:.01em;text-wrap:balance}
+.top p{color:var(--mute);font-size:13px;margin-top:2px}
+.sec-h{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px}
+.sec-h h2{font-size:16px;font-weight:700}
+.sec-h button,.link{color:var(--accent);font-size:13px;font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:14px}
+.stack{display:flex;flex-direction:column;gap:10px}
+.row{display:flex;align-items:center;gap:12px}
+.grow{flex:1;min-width:0}
+.mute{color:var(--mute);font-size:13px}
+.small{font-size:12px}
+
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{padding:6px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);font-size:13px}
+.chip[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff;font-weight:600}
+.flabel{font-size:12px;color:var(--mute);width:38px;flex:none;padding-top:7px}
+.frow{display:flex;gap:8px;align-items:flex-start}
+
+.btn{display:inline-flex;justify-content:center;align-items:center;padding:11px 16px;border-radius:12px;background:var(--accent);color:#fff;font-weight:700;font-size:15px}
+.btn.ghost{background:var(--accent-soft);color:var(--accent)}
+.btn.wide{width:100%}
+.btn.sm{padding:7px 12px;font-size:13px;border-radius:10px}
+
+.tile{width:46px;height:46px;border-radius:12px;flex:none;display:grid;place-items:center;font-family:var(--display);font-weight:700;font-size:20px;color:#fff}
+.tile.lg{width:60px;height:60px;font-size:26px;border-radius:14px}
+.score{font-family:var(--display);font-weight:700;font-size:18px;line-height:1}
+.score.good{color:var(--good)} .score.mid{color:var(--warn)} .score.bad{color:var(--bad)}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:600;white-space:nowrap}
+.pill.good{background:var(--good-soft);color:var(--good)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.new{background:var(--accent-soft);color:var(--accent)}
+.pill.plain{background:var(--paper);color:var(--mute)}
+.item{display:flex;gap:12px;align-items:center;width:100%;text-align:left;padding:12px 14px;background:var(--card);border:1px solid var(--line);border-radius:var(--r)}
+.item .name{font-weight:600;overflow-wrap:anywhere}
+.item.badline{border-left:4px solid var(--bad)}
+.rankno{width:22px;flex:none;font-family:var(--display);font-weight:700;color:var(--mute);text-align:center}
+
+.result{border:1.5px solid var(--accent);background:var(--card);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:10px}
+.result .why{font-size:13px;color:var(--mute)}
+.hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:4px;margin:0 -16px;padding-left:16px;padding-right:16px}
+.newcard{flex:none;width:158px;text-align:left;background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:flex;flex-direction:column;gap:6px}
+.newcard .name{font-weight:600}
+
+.seg{display:grid;grid-template-columns:repeat(3,1fr);background:var(--card);border:1px solid var(--line);border-radius:12px;padding:3px}
+.seg button{padding:8px 0;border-radius:9px;font-size:14px;color:var(--mute)}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff;font-weight:600}
+.search{width:100%;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--card);font:inherit;color:var(--ink)}
+.bars{display:flex;flex-direction:column;gap:5px}
+.bar{display:grid;grid-template-columns:74px 1fr 30px;gap:8px;align-items:center;font-size:12px}
+.bar span:nth-child(2){height:7px;border-radius:4px;background:var(--paper);overflow:hidden}
+.bar b{display:block;height:100%;border-radius:4px}
+
+.backdrop{position:absolute;inset:0;background:rgba(23,32,28,.42);display:none;align-items:flex-end;z-index:5}
+.backdrop.open{display:flex}
+.sheet{width:100%;max-height:88%;overflow-y:auto;background:var(--paper);border-radius:22px 22px 0 0;padding:16px 16px 26px;display:flex;flex-direction:column;gap:14px}
+.sheet-h{display:flex;justify-content:space-between;align-items:center}
+.close{width:34px;height:34px;border-radius:50%;background:var(--card);border:1px solid var(--line);font-size:16px}
+.stars{display:flex;gap:6px}
+.stars button{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--card);font-weight:700;color:var(--mute)}
+.stars button[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+textarea{width:100%;min-height:70px;padding:10px 12px;border-radius:12px;border:1px solid var(--line);font:inherit;color:var(--ink);background:var(--card);resize:vertical}
+.review{padding:10px 0;border-top:1px solid var(--line)}
+.review:first-child{border-top:0;padding-top:0}
+.toast{position:absolute;left:50%;bottom:78px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s;z-index:9;white-space:nowrap}
+.toast.on{opacity:1}
+.switch{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-top:1px solid var(--line);width:100%;text-align:left}
+.switch:first-of-type{border-top:0}
+.switch u{text-decoration:none;width:42px;height:24px;border-radius:12px;background:var(--line);position:relative;flex:none}
+.switch u::after{content:"";position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:left .15s}
+.switch[aria-pressed="true"] u{background:var(--accent)}
+.switch[aria-pressed="true"] u::after{left:21px}
+.map{display:grid;grid-template-columns:1fr;gap:10px}
+.map div{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:11px 13px}
+.map b{display:block;font-size:14px}
+.map span{font-size:13px;color:var(--mute)}
+.notes h1{font-family:var(--display);font-size:26px;line-height:1.25}
+.notes .tagline{color:var(--mute)}
+.demo{font-size:12px;color:var(--mute);text-align:center}
+.flow{display:flex;flex-direction:column;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 13px}
+.flow div{display:flex;gap:10px;align-items:flex-start;padding-bottom:12px;position:relative}
+.flow div:last-child{padding-bottom:0}
+.flow i{font-style:normal;flex:none;width:22px;height:22px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:grid;place-items:center;position:relative;z-index:1}
+.flow div:not(:last-child)::before{content:"";position:absolute;left:10px;top:22px;bottom:0;width:2px;background:var(--accent-soft)}
+.flow b{display:block;font-size:14px}
+.flow span{font-size:13px;color:var(--mute)}
+.fig{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:10px}
+.fig svg{width:100%;height:auto;display:block}
+.cap{font-size:12px;color:var(--mute);margin-top:6px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="notes" id="notes"></aside>
+  <main class="app">
+    <div class="view" id="view"></div>
+    <nav class="nav" id="nav" aria-label="主导航"></nav>
+    <div class="backdrop" id="backdrop"><div class="sheet" id="sheet" role="dialog" aria-modal="true"></div></div>
+    <div class="toast" id="toast" role="status"></div>
+  </main>
+</div>
+<script>
+/* ---------- 示例数据 ---------- */
+const C=[{id:'c1',name:'一食堂',sub:'东区，离教学楼最近'},{id:'c2',name:'二食堂',sub:'西区，宿舍楼下'},{id:'c3',name:'三食堂',sub:'北区，营业到 23:00'}];
+const W=[
+ ['w1','c1','川味小炒','1F 03 窗',12],['w2','c1','兰州拉面','1F 07 窗',9],['w3','c1','自选称重快餐','1F 中岛',6],['w4','c1','麻辣香锅','2F 02 窗',14],
+ ['w5','c2','广式烧腊','1F 01 窗',11],['w6','c2','轻食沙拉','1F 05 窗',3],['w7','c2','砂锅米线','2F 03 窗',10],['w8','c2','铁板炒饭','2F 06 窗',13],
+ ['w9','c3','东北水饺','1F 02 窗',5],['w10','c3','黄焖鸡米饭','1F 04 窗',8],['w11','c3','韩式拌饭','1F 08 窗',7],['w12','c3','夜宵炸串','2F 夜宵档',4]
+].map(a=>({id:a[0],c:a[1],name:a[2],loc:a[3],pop:a[4]}));
+/* 窗口, 菜名, 价格, 评分, 评价数, 辣度0-2, 品类, 标记(n新品 v素 h清真) */
+const D=[
+ ['w1','回锅肉盖饭',13,4.6,212,1,'饭',''],['w1','鱼香肉丝盖饭',12,4.4,168,1,'饭',''],['w1','麻婆豆腐饭',9,4.3,97,2,'饭','v'],['w1','藤椒鸡丁饭',14,4.5,12,2,'饭','n'],
+ ['w2','牛肉拉面',12,4.7,301,0,'面','h'],['w2','西红柿鸡蛋刀削面',10,4.5,143,0,'面','hv'],['w2','孜然羊肉炒面片',16,4.2,64,1,'面','h'],
+ ['w3','两荤一素套餐',15,3.1,188,0,'饭',''],['w3','称重自选',18,2.8,236,0,'饭',''],['w3','番茄炒蛋盖饭',8,3.6,71,0,'饭','v'],
+ ['w4','双人香锅',38,4.4,122,2,'饭',''],['w4','单人素香锅',16,4.1,58,2,'饭','v'],['w4','番茄肥牛锅',22,4.6,7,0,'饭','n'],
+ ['w5','叉烧饭',15,4.7,254,0,'饭',''],['w5','烧鸭饭',16,4.5,131,0,'饭',''],['w5','豉油鸡饭',14,4.3,77,0,'饭',''],
+ ['w6','鸡胸牛油果沙拉',19,4.2,86,0,'轻食',''],['w6','全素谷物碗',16,4.0,41,0,'轻食','v'],['w6','烟熏三文鱼卷',21,4.4,5,0,'轻食','n'],
+ ['w7','酸菜肥牛米线',15,4.5,176,1,'粉',''],['w7','菌菇鸡汤米线',14,4.6,149,0,'粉',''],['w7','麻辣牛肉米线',15,4.2,93,2,'粉',''],
+ ['w8','黑椒牛柳炒饭',14,3.2,157,1,'饭',''],['w8','扬州炒饭',11,3.0,203,0,'饭',''],['w8','铁板鱿鱼饭',15,3.4,66,1,'饭',''],
+ ['w9','猪肉白菜水饺',10,4.5,119,0,'面',''],['w9','韭菜鸡蛋水饺',9,4.4,84,0,'面','v'],['w9','酸汤水饺',12,4.6,9,1,'面','n'],
+ ['w10','黄焖鸡米饭（中份）',15,4.3,221,1,'饭',''],['w10','黄焖排骨饭',18,4.0,73,1,'饭',''],
+ ['w11','石锅拌饭',15,4.4,138,1,'饭',''],['w11','部队锅拉面',17,4.1,52,2,'面',''],['w11','泡菜炒饭',12,3.9,47,1,'饭',''],
+ ['w12','炸串拼盘',12,3.3,91,1,'小吃',''],['w12','烤冷面',8,3.8,112,1,'小吃',''],['w12','关东煮',10,3.5,60,0,'小吃','']
+].map((a,i)=>({id:'d'+i,w:a[0],name:a[1],price:a[2],rate:a[3],n:a[4],spicy:a[5],cat:a[6],flags:a[7]}));
+const GOOD=['分量足','出餐快','下饭','性价比高','料很足','不油腻'];
+const BAD=['分量少','太油','等太久','偏咸','端上来是凉的','价格虚高'];
+const TXT={
+ good:['分量很足，男生也能吃饱。','阿姨手不抖，肉给得多。','出餐快，下课冲过来五分钟就吃上了。','味道稳定，吃了一学期没踩过雷。','这个价格在学校里算很良心了。'],
+ mid:['中规中矩，不难吃也谈不上惊喜。','味道还行，就是高峰期要等挺久。','偶尔吃一次可以，天天吃会腻。'],
+ bad:['油太大了，吃完下午一直犯困。','排了十五分钟，端上来是温的。','算下来比外卖还贵，不值。','分量比上学期少了一圈。','偏咸，吃完喝了两瓶水。']
+};
+const WHO=['大一 · 外语','大二 · 计算机','大三 · 土木','研一 · 经管','大四 · 新闻','大二 · 数学'];
+const HUE={'饭':'#b8642a','面':'#8a6a1f','粉':'#a04a4a','轻食':'#3f8a5c','小吃':'#6b5aa6'};
+
+/* ---------- 状态 ---------- */
+let S={reviews:[],favs:[],wants:[],queue:{},prefs:{noSpicy:false,veg:false,halal:false},card:null,orders:[]};
+try{const raw=localStorage.getItem('canteen_v1');if(raw)S=Object.assign(S,JSON.parse(raw))}catch(e){}
+const save=()=>{try{localStorage.setItem('canteen_v1',JSON.stringify(S))}catch(e){}};
+const TABS=[['home','推荐'],['rank','榜单'],['canteens','食堂'],['me','我的']];
+let tab='home',F={budget:0,spicy:'any',cat:'any',fast:false},picked=null,pickEmpty=false,seg='bad',csel='c1',q='',sheet=null,draft={stars:0,tags:[],text:''};
+
+/* ---------- 工具 ---------- */
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const hash=s=>{let h=7;for(const ch of s)h=(h*31+ch.charCodeAt(0))%100003;return h};
+const win=id=>W.find(w=>w.id===id), dish=id=>D.find(d=>d.id===id), can=id=>C.find(c=>c.id===id);
+const mine=id=>S.reviews.filter(r=>r.d===id);
+function avg(d){const m=mine(d.id);const n=d.n+m.length;return{r:(d.rate*d.n+m.reduce((a,r)=>a+r.stars,0))/n,n}}
+function wavg(w){let s=0,n=0;D.filter(d=>d.w===w.id).forEach(d=>{const a=avg(d);s+=a.r*a.n;n+=a.n});return{r:s/n,n}}
+const cls=r=>r>=4.2?'good':r>=3.6?'mid':'bad';
+function period(){const h=new Date().getHours();return h<10?'早餐':h<14?'午餐':h<17?'下午茶':h<21?'晚餐':'夜宵'}
+function queue(wid){
+  const rep=S.queue[wid];if(rep&&Date.now()-rep.ts<30*60000)return[1,5,12][rep.lv];
+  const n=new Date();return Math.round(est(wid,n.getHours()+n.getMinutes()/60));
+}
+function est(wid,t){const g=(m,s)=>Math.exp(-((t-m)**2)/(2*s*s));return win(wid).pop*(0.18+g(12.1,.5)+g(18,.55)+.5*g(7.6,.4))}
+function qchart(wid){
+  const X=t=>10+(t-7)/14*280,max=win(wid).pop*1.25,Y=v=>70-v/max*52;let p='';
+  for(let t=7;t<=21.01;t+=.25)p+=X(t).toFixed(1)+','+Y(est(wid,t)).toFixed(1)+' ';
+  const n=new Date(),t=n.getHours()+n.getMinutes()/60,pk=est(wid,12.1);
+  return`<svg viewBox="0 0 300 90" role="img" aria-label="今日各时段排队时间估算">
+  <line x1="10" y1="70" x2="290" y2="70" stroke="var(--line)"/>
+  <polygon points="10,70 ${p}290,70" fill="var(--accent-soft)"/><polyline points="${p}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linejoin="round"/>
+  <text x="${X(12.1)}" y="${(Y(pk)-6).toFixed(1)}" text-anchor="middle" font-size="10" font-weight="700" fill="var(--ink)">午高峰约 ${Math.round(pk)} 分钟</text>
+  ${t>=7&&t<=21?`<line x1="${X(t)}" y1="${Y(est(wid,t))}" x2="${X(t)}" y2="70" stroke="var(--bad)" stroke-dasharray="2 3"/><circle cx="${X(t)}" cy="${Y(est(wid,t))}" r="4" fill="var(--bad)" stroke="#fff" stroke-width="1.5"/>`:''}
+  ${[7,12,18,21].map((h,i)=>`<text x="${X(h)}" y="85" text-anchor="${i===0?'start':i===3?'end':'middle'}" font-size="10" fill="var(--mute)">${h}:00</text>`).join('')}</svg>`;
+}
+const WEEK=7*864e5;
+const eligible=id=>S.orders.find(o=>o.d===id&&!o.done&&Date.now()-o.ts<WEEK);
+const pending=()=>S.orders.filter(o=>!o.done&&Date.now()-o.ts<WEEK&&dish(o.d));
+function ago(ts){const m=Math.floor((Date.now()-ts)/60000);return m<1?'刚刚':m<60?m+' 分钟前':m<1440?Math.floor(m/60)+' 小时前':Math.floor(m/1440)+' 天前'}
+function qpill(wid){const m=queue(wid);return m<=2?'<span class="pill good">不用排</span>':m<=6?`<span class="pill warn num">约 ${m} 分钟</span>`:`<span class="pill bad num">排队 ${m} 分钟</span>`}
+const BADW={w3:['价格虚高','端上来是凉的','分量少'],w8:['太油','等太久','偏咸'],w12:['太油','分量少','等太久']};
+function tagsOf(d){const a=avg(d),pool=a.r>=3.6?GOOD:(BADW[d.w]||BAD),h=hash(d.name);const i=h%pool.length,j=(i+1+h%3)%pool.length;
+  return[{t:pool[i],n:Math.max(2,Math.round(a.n*.42))},{t:pool[j],n:Math.max(1,Math.round(a.n*.27))}].map(x=>({...x,bad:a.r<3.6}))}
+function seedReviews(d){const h=hash(d.name),k=d.rate>=4.2?'good':d.rate>=3.6?'mid':'bad';
+  return[0,1,2].slice(0,Math.min(3,d.n)).map(i=>{const kk=i===2&&k==='good'?'mid':k;const p=TXT[kk];
+    return{who:WHO[(h+i*5)%WHO.length],stars:Math.max(1,Math.min(5,Math.round(d.rate)+(i===2?-1:0))),text:p[(h+i*3)%p.length],when:[1,3,6][i]+' 天前'}})}
+const tile=(d,lg)=>`<span class="tile${lg?' lg':''}" style="background:${HUE[d.cat]}" aria-hidden="true">${esc(d.name[0])}</span>`;
+const spicyTxt=d=>['不辣','微辣','重辣'][d.spicy];
+function toast(t){const e=$('toast');e.textContent=t;e.classList.add('on');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.remove('on'),1800)}
+function okPrefs(d){const p=S.prefs;return!(p.noSpicy&&d.spicy>0)&&!(p.veg&&!d.flags.includes('v'))&&!(p.halal&&!d.flags.includes('h'))}
+
+function dishItem(d,no){const a=avg(d),w=win(d.w);
+  return`<button class="item" data-act="dish" data-id="${d.id}">${no?`<span class="rankno num">${no}</span>`:''}${tile(d)}
+  <span class="grow"><span class="name">${esc(d.name)}</span> ${d.flags.includes('n')?'<span class="pill new">新品</span>':''}<br>
+  <span class="mute small">${can(w.c).name} · ${esc(w.name)} · ${spicyTxt(d)}</span></span>
+  <span style="text-align:right"><span class="score ${cls(a.r)} num">${a.r.toFixed(1)}</span><br><span class="mute small num">¥${d.price}</span></span></button>`}
+
+/* ---------- 推荐 ---------- */
+function doPick(){
+  let pool=D.filter(d=>avg(d).r>=3.6&&okPrefs(d)&&(!F.budget||d.price<=F.budget)&&!(F.spicy==='no'&&d.spicy>0)&&!(F.spicy==='yes'&&d.spicy===0)
+    &&(F.cat==='any'||d.cat===F.cat)&&!(F.fast&&queue(d.w)>5));
+  if(pool.length>1)pool=pool.filter(d=>d.id!==picked);
+  const fresh=pool.filter(d=>!recent(d.id));if(fresh.length)pool=fresh;
+  if(!pool.length){picked=null;pickEmpty=true;return}
+  pool.sort((a,b)=>(avg(b).r*20-queue(b.w)+(b.flags.includes('n')?4:0))-(avg(a).r*20-queue(a.w)+(a.flags.includes('n')?4:0)));
+  const top=pool.slice(0,6);picked=top[Math.floor(Math.random()*top.length)].id;pickEmpty=false;
+}
+function viewHome(){
+  const n=new Date(),wk='日一二三四五六'[n.getDay()];
+  const chip=(k,v,l)=>`<button class="chip" data-act="f" data-k="${k}" data-v="${v}" aria-pressed="${String(F[k])===String(v)}">${l}</button>`;
+  let res='';
+  if(picked){const d=dish(picked),a=avg(d),w=win(d.w),why=[`${a.r.toFixed(1)} 分，${a.n} 人评过`];
+    if(F.budget)why.push(`在 ¥${F.budget} 预算内`);if(d.flags.includes('n'))why.push('本周新品');if(S.orders.length&&!recent(d.id))why.push('你这两天没吃过');
+    res=`<div class="result"><div class="row">${tile(d,1)}<div class="grow"><b style="font-size:17px">${esc(d.name)}</b><br>
+      <span class="mute">${can(w.c).name} ${esc(w.loc)} · ${esc(w.name)}</span></div><b class="num" style="font-size:18px">¥${d.price}</b></div>
+      <div class="row" style="flex-wrap:wrap;gap:8px">${qpill(d.w)}<span class="why">${why.join('，')}</span></div>
+      <div class="row"><button class="btn ghost grow" data-act="pick">换一个</button><button class="btn grow" data-act="dish" data-id="${d.id}">看评价</button></div></div>`}
+  else if(pickEmpty)res=`<div class="card mute">没有同时满足这些条件的菜。放宽预算或口味再试一次；忌口设置在「我的」里。</div>`;
+  const news=D.filter(d=>d.flags.includes('n'));
+  const calm=W.map(w=>({w,m:queue(w.id),r:wavg(w).r})).filter(x=>x.r>=4).sort((a,b)=>a.m-b.m).slice(0,3);
+  const worst=W.map(w=>({w,r:wavg(w).r})).sort((a,b)=>a.r-b.r)[0];
+  return`<header class="top row" style="align-items:flex-start"><div class="grow"><h1>${period()}吃什么</h1><p>周${wk} <span class="num">${String(n.getHours()).padStart(2,'0')}:${String(n.getMinutes()).padStart(2,'0')}</span> · 排队时间按当前时段估算</p></div><button class="btn sm ghost" data-act="about">产品说明</button></header>
+  ${pending().length?`<button class="item" data-act="tab" data-v="me"><span class="grow"><span class="name">有 <span class="num">${pending().length}</span> 道吃过的菜还没点评</span><br><span class="mute small">打个分，帮下一个同学少踩一次雷</span></span><span class="link">去点评</span></button>`:''}
+  <section class="card stack"><div class="frow"><span class="flabel">预算</span><div class="chips">${chip('budget',0,'不限')}${chip('budget',10,'¥10 内')}${chip('budget',15,'¥15 内')}${chip('budget',20,'¥20 内')}</div></div>
+   <div class="frow"><span class="flabel">口味</span><div class="chips">${chip('spicy','any','都行')}${chip('spicy','no','不辣')}${chip('spicy','yes','要辣')}</div></div>
+   <div class="frow"><span class="flabel">品类</span><div class="chips">${chip('cat','any','都行')}${['饭','面','粉','轻食','小吃'].map(c=>chip('cat',c,c)).join('')}</div></div>
+   <div class="frow"><span class="flabel">赶课</span><div class="chips">${chip('fast',true,'只看 5 分钟内能吃上的')}${chip('fast',false,'不赶')}</div></div>
+   <button class="btn wide" data-act="pick">${picked?'再选一次':'帮我选一个'}</button></section>
+  ${res}
+  <section><div class="sec-h"><h2>本周新品</h2><button data-act="goseg" data-v="new">全部新品</button></div>
+   <div class="hscroll">${news.map(d=>{const a=avg(d),w=win(d.w);return`<button class="newcard" data-act="dish" data-id="${d.id}">${tile(d)}<span class="name">${esc(d.name)}</span>
+     <span class="mute small">${can(w.c).name} · ${esc(w.name)}</span><span class="small"><b class="num">¥${d.price}</b> · <span class="num">${a.n}</span> 人尝过</span></button>`}).join('')}</div></section>
+  <section><div class="sec-h"><h2>现在人少的好窗口</h2><button data-act="tab" data-v="canteens">全部窗口</button></div>
+   <div class="stack">${calm.map(x=>`<button class="item" data-act="win" data-id="${x.w.id}"><span class="grow"><span class="name">${esc(x.w.name)}</span><br><span class="mute small">${can(x.w.c).name} ${esc(x.w.loc)}</span></span>${qpill(x.w.id)}<span class="score ${cls(x.r)} num">${x.r.toFixed(1)}</span></button>`).join('')}</div></section>
+  <section><div class="sec-h"><h2>今日避雷</h2><button data-act="goseg" data-v="bad">避雷榜</button></div>
+   <button class="item badline" data-act="win" data-id="${worst.w.id}"><span class="grow"><span class="name">${esc(worst.w.name)}</span><br><span class="mute small">${can(worst.w.c).name} ${esc(worst.w.loc)} · 全校评分最低的窗口</span></span><span class="score bad num">${worst.r.toFixed(1)}</span></button></section>
+  <p class="demo">演示版使用示例数据，校园卡刷卡为模拟，你写的点评保存在本机浏览器里。</p>`;
+}
+
+/* ---------- 榜单 ---------- */
+function badReasons(w){const m={};D.filter(d=>d.w===w.id&&avg(d).r<3.6).forEach(d=>tagsOf(d).forEach(t=>m[t.t]=(m[t.t]||0)+t.n));
+  S.reviews.filter(r=>dish(r.d).w===w.id&&r.stars<=2).forEach(r=>r.tags.forEach(t=>m[t]=(m[t]||0)+1));
+  return Object.entries(m).sort((a,b)=>b[1]-a[1])}
+function viewRank(){
+  const sb=(v,l)=>`<button data-act="seg" data-v="${v}" aria-pressed="${seg===v}">${l}</button>`;let body='';
+  if(seg==='bad'){
+    const ws=W.map(w=>({w,a:wavg(w),rs:badReasons(w)})).filter(x=>x.a.r<3.7&&x.rs.length).sort((a,b)=>a.a.r-b.a.r);
+    body=`<p class="mute">按窗口汇总踩雷原因。你能看到它为什么被踩，再决定要不要去。</p>`+ws.map(x=>{const max=x.rs[0][1];
+      return`<div class="card stack" style="border-left:4px solid var(--bad)"><button class="row" data-act="win" data-id="${x.w.id}" style="text-align:left;width:100%"><span class="grow"><b>${esc(x.w.name)}</b><br><span class="mute small">${can(x.w.c).name} ${esc(x.w.loc)} · <span class="num">${x.a.n}</span> 条评价</span></span><span class="score bad num">${x.a.r.toFixed(1)}</span></button>
+      <div class="bars">${x.rs.slice(0,3).map(r=>`<div class="bar"><span>${esc(r[0])}</span><span><b style="width:${Math.round(r[1]/max*100)}%;background:var(--bad)"></b></span><span class="num mute">${r[1]}</span></div>`).join('')}</div>
+      <div class="row" style="flex-wrap:wrap;gap:8px"><span class="pill ${trend(x.w)>0?'good':trend(x.w)<0?'bad':'plain'} num">近 7 天 ${trend(x.w)>0?'回升 '+trend(x.w).toFixed(1):trend(x.w)<0?'下降 '+Math.abs(trend(x.w)).toFixed(1):'持平'}</span><span class="mute small">榜单按近 30 天评价滚动计算，改好了就能下榜</span></div>
+      ${REPLY[x.w.id]?`<p class="small" style="background:var(--paper);border-radius:10px;padding:8px 10px"><b>窗口回应</b>　${REPLY[x.w.id]}</p>`:''}</div>`}).join('')
+      +`<div class="sec-h" style="margin:8px 0 0"><h2>单品踩雷</h2></div><div class="stack">${D.filter(d=>avg(d).r<3.6).sort((a,b)=>avg(a).r-avg(b).r).slice(0,5).map((d,i)=>dishItem(d,i+1)).join('')}</div>`;
+  }else if(seg==='good'){
+    body=`<p class="mute">评价数满 30 条才上榜，避免刚上的菜靠几个好评冲榜。</p><div class="stack">${D.filter(d=>avg(d).n>=30&&okPrefs(d)).sort((a,b)=>avg(b).r-avg(a).r).slice(0,10).map((d,i)=>dishItem(d,i+1)).join('')}</div>`;
+  }else{
+    body=`<p class="mute">新菜评价少，先攒评价。点「求测评」，尝过的同学会优先看到这道菜。</p><div class="stack">${D.filter(d=>d.flags.includes('n')).map(d=>{const a=avg(d),w=win(d.w),on=S.wants.includes(d.id),cnt=hash(d.name)%40+8+(on?1:0);
+      return`<div class="card stack"><button class="row" data-act="dish" data-id="${d.id}" style="text-align:left;width:100%">${tile(d)}<span class="grow"><b>${esc(d.name)}</b> <span class="pill new">新品</span><br><span class="mute small">${can(w.c).name} · ${esc(w.name)} · ¥${d.price}</span></span><span class="score ${cls(a.r)} num">${a.r.toFixed(1)}</span></button>
+      <div class="row"><span class="mute small grow">仅 <span class="num">${a.n}</span> 条评价，<span class="num">${cnt}</span> 人在等测评</span><button class="btn sm ${on?'ghost':''}" data-act="want" data-id="${d.id}">${on?'已求测评':'求测评'}</button></div></div>`}).join('')}</div>`;
+  }
+  return`<header class="top"><h1>榜单</h1><p>红榜看什么好吃，避雷榜看哪里别去</p></header><div class="seg">${sb('bad','避雷榜')}${sb('good','红榜')}${sb('new','新品')}</div>${body}`;
+}
+
+/* ---------- 食堂 ---------- */
+function viewCanteens(){
+  let body;
+  if(q.trim()){const k=q.trim().toLowerCase(),hit=D.filter(d=>(d.name+win(d.w).name).toLowerCase().includes(k));
+    body=hit.length?`<div class="stack">${hit.map(d=>dishItem(d)).join('')}</div>`:`<div class="card mute">没找到「${esc(q)}」。换个菜名或窗口名试试，比如「米线」「烧腊」。</div>`}
+  else body=`<div class="chips">${C.map(c=>`<button class="chip" data-act="csel" data-v="${c.id}" aria-pressed="${csel===c.id}">${c.name}</button>`).join('')}</div>
+    <p class="mute">${can(csel).sub}</p><div class="stack">${W.filter(w=>w.c===csel).sort((a,b)=>wavg(b).r-wavg(a).r).map(w=>{const a=wavg(w),ds=D.filter(d=>d.w===w.id),ps=ds.map(d=>d.price);
+      return`<button class="item ${a.r<3.6?'badline':''}" data-act="win" data-id="${w.id}"><span class="grow"><span class="name">${esc(w.name)}</span> ${ds.some(d=>d.flags.includes('n'))?'<span class="pill new">有新品</span>':''}<br>
+      <span class="mute small">${esc(w.loc)} · <span class="num">¥${Math.min(...ps)}–${Math.max(...ps)}</span> · <span class="num">${a.n}</span> 条评价</span></span>${qpill(w.id)}<span class="score ${cls(a.r)} num">${a.r.toFixed(1)}</span></button>`}).join('')}</div>`;
+  return`<header class="top"><h1>食堂</h1><p>3 个食堂，12 个窗口，36 道菜</p></header>
+  <input class="search" id="search" type="search" placeholder="搜菜名或窗口，例如 米线" value="${esc(q)}" aria-label="搜索菜品或窗口">${`<div id="cbody" class="stack" style="gap:14px">${body}</div>`}`;
+}
+
+/* ---------- 我的 ---------- */
+const MAP=[['不知道吃什么','帮我选：按预算、口味、品类和排队时间给出一个结果，不满意就换'],['怕踩雷','避雷榜：评价汇总到窗口，直接列出被踩的原因和次数'],['新菜没人知道','新品区：新菜单独展示，求测评功能帮它攒到第一批评价'],['高峰期排队','排队上报：同学一键上报，30 分钟内覆盖系统估算'],['评价不可信','校园卡消费后才能点评，一次消费一条；红榜要求满 30 条评价']];
+const mapHtml=()=>`<div class="map">${MAP.map(m=>`<div><b>${m[0]}</b><span>${m[1]}</span></div>`).join('')}</div>`;
+function structSvg(){const cols=[['推荐',['帮我选','本周新品','人少窗口']],['榜单',['避雷榜','红榜','求测评']],['食堂',['窗口列表','搜索','排队上报']],['我的',['校园卡','待点评','忌口收藏']]];
+  return`<svg viewBox="0 0 320 150" role="img" aria-label="产品结构图：四个标签及其功能"><rect x="105" y="4" width="110" height="28" rx="8" fill="var(--ink)"/><text x="160" y="23" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">食堂吃什么</text>
+  <path d="M160 32V46M40 46H280${cols.map((c,i)=>'M'+(40+i*80)+' 46V58').join('')}" stroke="var(--mute)" fill="none"/>
+  ${cols.map((c,i)=>{const x=40+i*80;return`<rect x="${x-34}" y="58" width="68" height="26" rx="7" fill="var(--accent)"/><text x="${x}" y="75" text-anchor="middle" font-size="12" font-weight="700" fill="#fff">${c[0]}</text>`+c[1].map((t,j)=>`<text x="${x}" y="${104+j*17}" text-anchor="middle" font-size="11" fill="var(--ink)">${t}</text>`).join('')}).join('')}</svg>`}
+const FLOW=[['校园卡在窗口消费','系统记下窗口、菜品和时间'],['解锁这道菜的一次点评','7 天内有效，一次消费只能写一条'],['打分并选择原因','1–2 分需要选踩雷原因'],['评分和榜单实时更新','低分进避雷榜，满 30 条才能上红榜'],['影响下一个人的推荐','低于 3.6 分的菜不会被推荐']];
+const figs=()=>`<div><div class="fig">${structSvg()}</div><p class="cap">图 1 产品结构：四个标签和各自的功能</p></div>
+ <div><div class="flow">${FLOW.map((f,i)=>`<div><i>${i+1}</i><p><b>${f[0]}</b><span>${f[1]}</span></p></div>`).join('')}</div><p class="cap">图 2 点评可信闭环：从刷卡到推荐</p></div>`;
+const ABOUT=[
+ ['目标用户与场景','在校本科生和研究生。典型场景是午晚餐高峰前五分钟，人在下课路上或食堂门口，单手看手机。所以首页不做信息流，直接给一个结果。'],
+ ['三步看完演示','① 首页点「帮我选一个」，换几次条件。② 打开任意一道菜，绑定校园卡，模拟刷卡，打 1 分并选原因。③ 回到榜单，看这道菜的评分和避雷榜的变化。'],
+ ['怎么衡量做得好不好','决策完成率：打开后 30 秒内点进一道菜的比例。点评转化率：刷卡后 24 小时内写点评的比例。避雷有效性：上榜窗口在 30 天内评分回升的数量。'],
+ ['冷启动','先只做一个食堂。上线前用校园卡消费笔数生成初始热度，页面不会是空的。新品靠「求测评」把想吃的人和吃过的人连起来。'],
+ ['已实现与规划','已实现：推荐、三张榜单、搜索、排队上报、消费后点评、忌口、收藏。规划中：接入真实校园卡消费接口，窗口端回应入口，按个人消费历史做推荐。']];
+const aboutHtml=()=>`<div class="map">${ABOUT.map(m=>`<div><b>${m[0]}</b><span>${m[1]}</span></div>`).join('')}</div>`;
+function sheetAbout(){return`<div class="sheet-h"><b style="font-size:19px">产品说明</b><button class="close" data-act="close" aria-label="关闭">✕</button></div>
+  <p class="mute">校园食堂点评推荐。帮学生三十秒内决定吃什么，发现新菜，避开踩雷窗口。</p>${aboutHtml()}${figs()}<div class="sec-h" style="margin:0"><h2>痛点与对应功能</h2></div>${mapHtml()}`}
+const REPLY={w8:'已下调铁板用油量，11 月 10 日起执行，欢迎再来试试。',w3:'称重单价牌已重新张贴在取餐口，结算前可以先看价。'};
+const trend=w=>(hash(w.name)%5-1)/10;
+const recent=id=>S.orders.some(o=>o.d===id&&Date.now()-o.ts<2*864e5);
+function sheetCard(){return`<div class="sheet-h"><b style="font-size:19px">绑定校园卡</b><button class="close" data-act="close" aria-label="关闭">✕</button></div>
+  <p class="mute">绑定后，系统只读取消费的窗口、菜品和时间，用来确认你真的吃过。点评对其他同学只显示年级和专业。</p>
+  <div class="card stack"><label for="sid" class="small mute">学号</label><input class="search" id="sid" inputmode="numeric" maxlength="12" placeholder="例如 20231204" autocomplete="off">
+  <p class="small" id="siderr" style="color:var(--bad)"></p><button class="btn wide" data-act="bind">绑定</button></div>
+  <p class="demo">演示版不联网校验，输入 6–12 位数字即可。</p>`}
+function viewMe(){
+  const pend=pending();
+  const sw=(k,l,s)=>`<button class="switch" data-act="pref" data-k="${k}" aria-pressed="${!!S.prefs[k]}"><span><b>${l}</b><br><span class="mute small">${s}</span></span><u></u></button>`;
+  const favs=S.favs.map(dish).filter(Boolean);
+  return`<header class="top"><h1>我的</h1><p>忌口会用在推荐和红榜里</p></header>
+  <section class="card stack">${S.card?`<div class="row"><span class="grow"><b>校园卡已绑定</b><br><span class="mute small num">学号 ${esc(S.card.sid.slice(0,2))}****${esc(S.card.sid.slice(-2))} · 累计消费 ${S.orders.length} 笔</span></span><button class="link" data-act="unbind">解绑</button></div>`
+    :`<b>校园卡未绑定</b><span class="mute small">绑定后，用校园卡消费过的菜才能点评。</span><button class="btn wide" data-act="opencard">绑定校园卡</button>`}</section>
+  ${pend.length?`<section><div class="sec-h"><h2>待点评 <span class="num mute">${pend.length}</span></h2></div><div class="stack">${pend.map(o=>{const d=dish(o.d);return`<div class="item">${tile(d)}<span class="grow"><span class="name">${esc(d.name)}</span><br><span class="mute small">${ago(o.ts)}刷卡 · <span class="num">¥${d.price}</span></span></span><button class="btn sm" data-act="dish" data-id="${d.id}">去点评</button></div>`}).join('')}</div></section>`:''}
+  <section class="card">${sw('noSpicy','不吃辣','只推荐不辣的菜')}${sw('veg','素食','只推荐素菜')}${sw('halal','清真','只推荐清真窗口')}</section>
+  <section><div class="sec-h"><h2>收藏 <span class="num mute">${favs.length}</span></h2></div>${favs.length?`<div class="stack">${favs.map(d=>dishItem(d)).join('')}</div>`:`<div class="card mute">还没有收藏。在菜品页点「收藏」，下次不用再找。</div>`}</section>
+  <section><div class="sec-h"><h2>我的点评 <span class="num mute">${S.reviews.length}</span></h2></div>${S.reviews.length?`<div class="stack">${S.reviews.slice().reverse().map(r=>{const d=dish(r.d);return`<div class="card"><div class="row"><b class="grow">${esc(d.name)}</b><span class="pill ${r.stars>=4?'good':r.stars<=2?'bad':'warn'} num">${r.stars} 分</span></div>
+    ${r.tags.length?`<p class="mute small">${r.tags.map(esc).join(' · ')}</p>`:''}${r.text?`<p style="margin-top:4px">${esc(r.text)}</p>`:''}<button class="link" style="margin-top:6px" data-act="delrev" data-ts="${r.ts}">删除这条点评</button></div>`}).join('')}</div>`:`<div class="card mute">还没有点评。吃完打个分，帮下一个同学少踩一次雷。</div>`}</section>
+  <section class="stack"><div class="sec-h" style="margin:0"><h2>产品设计说明</h2></div>${figs()}${mapHtml()}${aboutHtml()}</section>`;
+}
+
+/* ---------- 弹层 ---------- */
+function sheetDish(d){
+  const a=avg(d),w=win(d.w),fav=S.favs.includes(d.id),tg=tagsOf(d),ms=mine(d.id);
+  const pool=draft.stars>=4?GOOD:draft.stars&&draft.stars<=2?BAD:draft.stars===3?GOOD.slice(0,3).concat(BAD.slice(0,3)):[];
+  const revs=ms.slice().reverse().map(r=>({who:'我',stars:r.stars,text:r.text||r.tags.join(' · ')||'只打了分',when:ago(r.ts),v:r.verified})).concat(seedReviews(d).map(r=>({...r,v:true})));
+  const ord=eligible(d.id);
+  const form=!S.card?`<section class="card stack"><b>写点评</b><span class="mute small">只有用校园卡在这个窗口消费过，才能点评这道菜。请先绑定校园卡。</span><button class="btn wide" data-act="opencard">绑定校园卡</button></section>`
+   :!ord?`<section class="card stack"><b>写点评</b><span class="mute small">近 7 天没有这道菜的校园卡消费记录，暂时不能点评。一次消费可以写一条点评。</span><button class="btn ghost wide" data-act="pay" data-id="${d.id}">演示：模拟刷卡消费 ¥${d.price}</button></section>`
+   :`<section class="card stack"><div class="row"><b class="grow">写点评</b><span class="pill good">已验证消费 · ${ago(ord.ts)}</span></div><div class="stars" role="group" aria-label="打分">${[1,2,3,4,5].map(i=>`<button data-act="star" data-v="${i}" aria-pressed="${draft.stars>=i}" aria-label="${i} 分">${i}</button>`).join('')}</div>
+   ${pool.length?`<div class="chips">${pool.map(t=>`<button class="chip" data-act="dtag" data-v="${t}" aria-pressed="${draft.tags.includes(t)}">${t}</button>`).join('')}</div>`:'<span class="mute small">先打分，再选原因。1–2 分会计入避雷榜。</span>'}
+   <textarea id="rtext" placeholder="说一句给下一个同学的话（可不填）" aria-label="点评内容">${esc(draft.text)}</textarea>
+   <button class="btn wide" data-act="submit" data-id="${d.id}">提交点评</button></section>`;
+  return`<div class="sheet-h"><span class="mute">${can(w.c).name} ${esc(w.loc)}</span><button class="close" data-act="close" aria-label="关闭">✕</button></div>
+  <div class="row">${tile(d,1)}<div class="grow"><b style="font-size:19px">${esc(d.name)}</b> ${d.flags.includes('n')?'<span class="pill new">新品</span>':''}<br><span class="mute">${esc(w.name)} · ${spicyTxt(d)} · <b class="num" style="color:var(--ink)">¥${d.price}</b></span></div>
+   <div style="text-align:right"><span class="score ${cls(a.r)} num" style="font-size:26px">${a.r.toFixed(1)}</span><br><span class="mute small num">${a.n} 条</span></div></div>
+  <div class="chips">${qpill(d.w)}${tg.map(t=>`<span class="pill ${t.bad?'bad':'good'}">${t.t} <span class="num">${t.n}</span></span>`).join('')}${a.n<30?'<span class="pill plain">评价不足 30 条，分数仅供参考</span>':''}</div>
+  <div class="row"><button class="btn ghost grow" data-act="fav" data-id="${d.id}">${fav?'已收藏':'收藏'}</button><button class="btn ghost grow" data-act="win" data-id="${w.id}">看这个窗口</button></div>
+  ${form}
+  <section class="card"><b>同学怎么说</b><div style="margin-top:10px">${revs.map(r=>`<div class="review"><div class="row"><span class="grow small mute">${esc(r.who)} · ${r.when}${r.v?' · 已验证消费':''}</span><span class="pill ${r.stars>=4?'good':r.stars<=2?'bad':'warn'} num">${r.stars} 分</span></div><p>${esc(r.text)}</p></div>`).join('')}</div></section>`;
+}
+function sheetWin(w){
+  const a=wavg(w),rs=badReasons(w),rep=S.queue[w.id],lv=rep&&Date.now()-rep.ts<30*60000?rep.lv:-1;
+  return`<div class="sheet-h"><span class="mute">${can(w.c).name} ${esc(w.loc)}</span><button class="close" data-act="close" aria-label="关闭">✕</button></div>
+  <div class="row"><div class="grow"><b style="font-size:19px">${esc(w.name)}</b><br><span class="mute"><span class="num">${a.n}</span> 条评价</span></div><span class="score ${cls(a.r)} num" style="font-size:26px">${a.r.toFixed(1)}</span></div>
+  ${rs.length?`<div class="card stack" style="border-left:4px solid var(--bad)"><b>被踩的原因</b><div class="bars">${rs.slice(0,3).map(r=>`<div class="bar"><span>${esc(r[0])}</span><span><b style="width:${Math.round(r[1]/rs[0][1]*100)}%;background:var(--bad)"></b></span><span class="num mute">${r[1]}</span></div>`).join('')}</div></div>`:''}
+  <section class="card stack"><div class="row"><b class="grow">现在排队</b>${qpill(w.id)}</div><span class="mute small">你在现场？报一下，30 分钟内其他同学看到的就是你报的。</span>
+   <div>${qchart(w.id)}<p class="cap">今日各时段排队估算，红点是现在</p></div>
+   <div class="chips">${['不用排','5 分钟左右','10 分钟以上'].map((t,i)=>`<button class="chip" data-act="rep" data-id="${w.id}" data-v="${i}" aria-pressed="${lv===i}">${t}</button>`).join('')}</div></section>
+  <section><div class="sec-h"><h2>这个窗口的菜</h2></div><div class="stack">${D.filter(d=>d.w===w.id).sort((x,y)=>avg(y).r-avg(x).r).map(d=>dishItem(d)).join('')}</div></section>`;
+}
+
+/* ---------- 渲染 ---------- */
+function render(){
+  $('view').innerHTML={home:viewHome,rank:viewRank,canteens:viewCanteens,me:viewMe}[tab]();
+  $('nav').innerHTML=TABS.map(t=>`<button data-act="tab" data-v="${t[0]}" ${tab===t[0]?'aria-current="page"':''}><i></i>${t[1]}</button>`).join('');
+  renderSheet();
+}
+function renderSheet(){
+  const b=$('backdrop');
+  if(!sheet){b.classList.remove('open');return}
+  $('sheet').innerHTML=sheet.t==='card'?sheetCard():sheet.t==='about'?sheetAbout():sheet.t==='dish'?sheetDish(dish(sheet.id)):sheetWin(win(sheet.id));b.classList.add('open');
+}
+function go(t){tab=t;try{history.replaceState(null,'','#'+t)}catch(e){}render();$('view').scrollTop=0}
+function open(t,id){sheet={t,id};draft={stars:0,tags:[],text:''};renderSheet();$('sheet').scrollTop=0}
+const keep=()=>{const e=$('rtext');if(e)draft.text=e.value};
+
+document.addEventListener('click',e=>{
+  if(e.target.id==='backdrop'){sheet=null;renderSheet();return}
+  const b=e.target.closest('[data-act]');if(!b)return;const{act,v,id,k}=b.dataset;
+  if(act==='tab')go(v);
+  else if(act==='f'){F[k]=k==='budget'?+v:k==='fast'?v==='true':v;render()}
+  else if(act==='pick'){doPick();render()}
+  else if(act==='goseg'){seg=v;go('rank')}
+  else if(act==='seg'){seg=v;render()}
+  else if(act==='csel'){csel=v;render()}
+  else if(act==='dish')open('dish',id);
+  else if(act==='win')open('win',id);
+  else if(act==='close'){sheet=null;render()}
+  else if(act==='star'){keep();draft.stars=+v;draft.tags=[];renderSheet()}
+  else if(act==='dtag'){keep();draft.tags=draft.tags.includes(v)?draft.tags.filter(t=>t!==v):draft.tags.concat(v);renderSheet()}
+  else if(act==='submit'){keep();if(!draft.stars){toast('先打个分再提交');return}
+    const o=eligible(id);if(!o){toast('需要先有校园卡消费记录');renderSheet();return}
+    if(draft.stars<=2&&!draft.tags.length){toast('请选一个踩雷原因');return}
+    o.done=true;S.reviews.push({d:id,stars:draft.stars,tags:draft.tags,text:draft.text.trim().slice(0,200),ts:Date.now(),verified:true});save();draft={stars:0,tags:[],text:''};render();toast('点评已发布，评分已更新')}
+  else if(act==='fav'){S.favs=S.favs.includes(id)?S.favs.filter(x=>x!==id):S.favs.concat(id);save();render();toast(S.favs.includes(id)?'已收藏':'已取消收藏')}
+  else if(act==='want'){S.wants=S.wants.includes(id)?S.wants.filter(x=>x!==id):S.wants.concat(id);save();render()}
+  else if(act==='rep'){S.queue[id]={lv:+v,ts:Date.now()};save();render();toast('已上报，谢谢你')}
+  else if(act==='pref'){S.prefs[k]=!S.prefs[k];save();picked=null;render()}
+  else if(act==='about'){sheet={t:'about'};renderSheet();$('sheet').scrollTop=0}
+  else if(act==='opencard'){sheet={t:'card',back:sheet};renderSheet()}
+  else if(act==='bind'){const val=$('sid').value.trim();if(!/^\d{6,12}$/.test(val)){$('siderr').textContent='学号应为 6–12 位数字，请检查后重新输入。';return}
+    S.card={sid:val};save();sheet=sheet&&sheet.back||null;render();toast('校园卡已绑定')}
+  else if(act==='unbind'){S.card=null;save();render();toast('已解绑，消费记录保留')}
+  else if(act==='pay'){S.orders.push({d:id,ts:Date.now(),done:false});save();render();toast('已刷卡，可以点评了')}
+  else if(act==='delrev'){S.reviews=S.reviews.filter(r=>String(r.ts)!==b.dataset.ts);save();render();toast('已删除')}
+});
+document.addEventListener('input',e=>{if(e.target.id==='search'){q=e.target.value;const pos=e.target.selectionStart;$('view').innerHTML=viewCanteens();const s=$('search');s.focus();try{s.setSelectionRange(pos,pos)}catch(_){}}});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sheet){sheet=null;render()}});
+window.addEventListener('hashchange',()=>{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h)&&h!==tab){tab=h;render()}});
+
+$('notes').innerHTML=`<h1>食堂吃什么</h1><p class="tagline">校园食堂点评推荐。帮学生三十秒内决定吃什么，发现新菜，避开踩雷窗口。</p>
+ ${figs()}<div class="sec-h" style="margin:6px 0 0"><h2>痛点与对应功能</h2></div>${mapHtml()}<div class="sec-h" style="margin:6px 0 0"><h2>设计思路</h2></div>${aboutHtml()}
+ <p class="mute small">右侧为可操作的演示，菜品与评价是示例数据。校园卡绑定和刷卡为模拟流程；点评、收藏、上报排队都会立即生效，并保存在当前浏览器。</p>`;
+{const h=location.hash.slice(1);if(TABS.some(t=>t[0]===h))tab=h}
+doPick();render();
+</script>
+</body>
+</html>
